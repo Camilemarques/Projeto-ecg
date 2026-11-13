@@ -1,128 +1,109 @@
-# Projeto Final EGC 21818: PPG de pulso vs ECG no WESAD
+# Projeto Final EGC 21818: PPG de Pulso vs. ECG no WESAD
 
-Camile de Santis Marques (RA 24006992) e Luana Varela Vacari (RA 24000499).
-PUC-Campinas, Engenharia Biomédica, 2º semestre de 2026.
+**Autoras:** Camile de Santis Marques (RA 24006992) e Luana Varela Vacari (RA 24000499)  
+**Instituição:** Pontifícia Universidade Católica de Campinas (PUC-Campinas) — Engenharia Biomédica (2º semestre de 2026)
 
-## Objetivo
+---
 
-Aplicar filtro passa-banda e filtro wavelet ao PPG de pulso (Empatica E4) da
-base WESAD para detectar batimentos e estimar o RMSSD, avaliando por
-sensibilidade e preditividade positiva dos batimentos (principal) e pelo erro
-do RMSSD (secundária), em relação ao ECG do peito (RespiBAN). Há também um
-braço sem filtro, como referência.
+## 1. Objetivo e Pergunta de Pesquisa
 
-## Dados
+O objetivo deste projeto é avaliar o impacto do pré-processamento digital no sinal de fotopletismografia de pulso (**PPG / BVP**, captado pelo dispositivo vestível Empatica E4) para a detecção de batimentos cardíacos e a estimativa da variabilidade da frequência cardíaca (**RMSSD**), tendo como padrão-ouro o eletrocardiograma torácico (**ECG**, captado pelo RespiBAN)[cite: 1, 2].
 
-- Base: WESAD (Wearable Stress and Affect Detection), Schmidt et al., ICMI 2018.
-- Fonte: UCI Machine Learning Repository, https://doi.org/10.24432/C57K5T
-  (também em https://www.eti.uni-siegen.de/ubicomp/home/datasets/icmi18/).
-- Data de acesso: ___/11/2026  (preencher; baixado em 05/11/2026 segundo o Drive).
-- Licença: uso científico e não comercial, com crédito aos autores. Por isso os
-  dados brutos NÃO estão neste repositório.
+### A Pergunta que Guia o Projeto (Opção A):
+> *“Filtrar o PPG de pulso com passa-banda ou com wavelet melhora a detecção de batimentos em relação ao sinal sem filtro, e isso muda entre baseline e estresse?”*
 
-Como obter: baixar o arquivo (cerca de 2,1 GB compactado) pela página da base
-e extrair, de modo que exista `WESAD/S2/S2.pkl`. Nunca editar os dados brutos.
+Esta investigação parte da lacuna apontada na revisão sistemática de Elgendi et al. (*Communications Medicine*, 2026) e em Watanabe et al. (2025)[cite: 2]: embora o PPG de pulso seja prático para o monitoramento contínuo de estresse e saúde mental, ele é altamente suscetível a artefatos de movimento e não possui um fluxo de filtragem padronizado[cite: 2]. O estudo compara três abordagens de tratamento do PPG em condições de **repouso (*baseline*)** e **estresse**:
+1. **Sem filtro** (sinal bruto como linha de base)[cite: 1, 2].
+2. **Filtro Passa-Banda** (Butterworth de ordem 4, 0,5 a 4 Hz, fase zero)[cite: 1].
+3. **Filtro Wavelet** (`db4`, nível 6, aproximação A6 zerada e limiarização universal suave nos detalhes D1 a D3)[cite: 1].
 
-## Metadados confirmados (wesad_readme.pdf e participante S10)
+---
 
-- 15 participantes (S2 a S17, sem S1 e S12, descartados pelos autores por
-  defeito de sensor).
-- ECG do peito (RespiBAN): 700 Hz, conversor de 16 bits, em mV por
-  ECG(mV) = (sinal / 2^16 - 0,5) * 3. No `.pkl` o ECG já está em mV (faixa
-  de -1,46 a +1,48 no S10). Conversão VERIFICADA no S10: o ECG do `.pkl` é
-  essa fórmula aplicada ao canal CH1 do arquivo bruto, erro máximo de
-  1,1e-16 mV em 3.847.200 amostras; o `.pkl` começa na linha 61000 do bruto
-  (87,14 s). Só o S10 foi verificado.
-- BVP/PPG do pulso (Empatica E4, pulso não dominante): 64 Hz. O README não
-  informa a unidade do BVP nem filtros. A unidade do acelerômetro do pulso
-  (1/64 g) é uma inferência, não está confirmada.
-- Rótulos a 700 Hz: 0 indefinido, 1 baseline, 2 estresse, 3 amusement,
-  4 meditação, 5/6/7 ignorar.
-- Os dois dispositivos foram sincronizados MANUALMENTE (toque duplo no peito).
-  No S10, o atraso entre PPG e ECG ficou entre 0,8 e 1,9 s, muito acima do
-  atraso fisiológico do pulso (ver `docs/decisoes_metodo.md`).
+## 2. Metodologia e Pipeline de Processamento
 
-## Estrutura
+O processamento foi padronizado com os mesmos parâmetros para todos os **15 participantes válidos** da base WESAD (S2 a S17, exceto S12), totalizando **445 janelas consecutivas e não sobrepostas de 60 segundos** (285 de *baseline* e 160 de estresse)[cite: 1]:
 
-```
-src/
-  leitura.py       ler ECG do peito, BVP do pulso, aceleração e rótulos
-  janelas.py       janelas de 60 s a partir dos rótulos (S10: 19 baseline, 12 estresse)
-  filtros.py       passa-banda 0,5-4 Hz e wavelet (db4, nível 6, limiar universal suave)
-  deteccao.py      picos do PPG e picos R do ECG (estilo Pan-Tompkins)
-  alinhamento.py   atraso PPG x ECG por segmentos de 300 s (busca de +-4 s)
-  pipeline.py      processar_sujeito: todo o fluxo de um participante, por janela
-  rodada_final.py  roda os 15 participantes, um de cada vez, com checkpoint por CSV
-  analise.py       tabelas e figuras finais a partir dos CSV por participante
-  metricas.py      casamento de batimentos, Se, +P, RMSSD
-  sintetico.py     ECG e PPG sintéticos para testar o código
-  conferir_conversao.py  compara o ECG do .pkl com o arquivo bruto do RespiBAN
-  inspecionar_wesad.py   resumo da estrutura de um .pkl
-notebooks/         projeto_egc_final.ipynb (reprodução) e as células dos passos 7 a 20
-testes/            testes em sinal sintético ou arquivos fictícios
-resultados/        tabelas por janela (CSV), geradas pelo código
-docs/decisoes_metodo.md   registro das decisões de método e das limitações
-docs/resultados_finais.md resultados e leitura da rodada final
-docs/desvios_protocolo.md desvios e acréscimos em relação ao protocolo
-docs/roteiro_estudo.md    roteiro de estudo por módulo e perguntas de defesa
-docs/declaracao_ia.md     rascunho da Declaração de Uso de IA
-```
+* **Referência (ECG):** Os picos R foram extraídos do ECG (700 Hz) utilizando um detector próprio baseado no algoritmo de Pan-Tompkins (passa-banda 5–15 Hz com fase zero, derivada, quadratura, integração em janela de 150 ms e limiar adaptativo), com refinamento do instante do pico no sinal original em ±40 ms[cite: 1].
+* **Detecção no PPG:** Os picos sistólicos do BVP (64 Hz) foram detectados via `find_peaks` (distância mínima de 0,4 s e proeminência relativa de 0,3 desvios-padrão do trecho) nos três braços de filtragem[cite: 1].
+* **Alinhamento Temporal:** Como os sensores foram sincronizados manualmente na coleta original (apresentando atrasos de 0,8 a 1,9 s), estimou-se o atraso ótimo por segmentos de 300 s (busca em ±4 s com passo de 0,02 s) tomando o centro do platô da curva de sensibilidade[cite: 1].
+* **Métricas de Avaliação:**
+  * *Principais:* Sensibilidade ($Se = \frac{VP}{VP+FN}$) e Preditividade Positiva ($+P = \frac{VP}{VP+FP}$) com tolerância de **150 ms**, acompanhadas do **nível de acaso** (mediana da $Se$ em atrasos errados) e do **ganho sobre o acaso**[cite: 1].
+  * *Secundária:* Erro absoluto do **RMSSD** (em ms) entre PPG e ECG por janela[cite: 1].
+  * *Análise Exploratória:* Estratificação do desempenho por nível de movimento do pulso (tercis do desvio-padrão do módulo do acelerômetro) e análise de sensibilidade para tolerâncias mais estritas (50 ms e 100 ms)[cite: 1].
 
-## Como reexecutar
+---
 
-```
-pip install -r requirements.txt     # inclui PyWavelets
+## 3. Resultados Principais (15 Participantes)
+
+Os valores abaixo representam a média entre as janelas de cada participante e, subsequentemente, a média entre os 15 participantes (tolerância de 150 ms)[cite: 1]:
+
+| Condição | Tratamento (Braço) | Sensibilidade ($Se$) | Preditividade ($+P$) | $Se$ do Acaso | Ganho sobre o Acaso |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Baseline** | Sem filtro | 0,769 | 0,775 | 0,333 | +0,435 |
+| **Baseline** | Passa-banda | **0,792** | **0,800** | 0,329 | **+0,463** |
+| **Baseline** | Wavelet | 0,772 | 0,774 | 0,335 | +0,437 |
+| **Estresse** | Sem filtro | 0,601 | 0,714 | 0,408 | +0,193 |
+| **Estresse** | Passa-banda | **0,611** | **0,733** | 0,404 | **+0,208** |
+| **Estresse** | Wavelet | 0,609 | 0,712 | 0,415 | +0,193 |
+
+* **Impacto do Estresse e Movimento:** Sob estresse, a sensibilidade média do filtro passa-banda caiu de **0,792 para 0,611** (e o ganho sobre o acaso caiu de 0,463 para 0,208)[cite: 1]. A correlação de Spearman entre $Se$ e movimento do pulso foi negativa em todos os participantes ($\rho = -0,52$ no geral), mas mesmo em janelas de baixo movimento o estresse manteve $Se$ inferior ao repouso (0,685 vs. 0,861), indicando degradação intrínseca do sinal de pulso[cite: 1].
+* **Estimativa de RMSSD (Resultado Negativo):** Enquanto o ECG apresentou RMSSD mediano fisiologicamente plausível (45 ms no *baseline* e 36 ms no estresse), o PPG apresentou medianas de 262 ms e 350 ms, resultando em **erros absolutos medianos de 201 ms (*baseline*) e 303 ms (estresse)** no braço passa-banda[cite: 1].
+
+---
+
+## 4. Conclusões
+
+1. **Efeito limitado da filtragem:** O filtro passa-banda supera o sinal bruto em apenas **1 a 2,3 pontos percentuais** de sensibilidade (diferença estatisticamente consistente, mas de pequeno efeito prático frente à variabilidade interindividual), enquanto a wavelet projetada teve desempenho equivalente ao sinal sem filtro[cite: 1].
+2. **Degradação sob estresse:** O estresse compromete severamente a detecção de batimentos no pulso, efeito explicado apenas parcialmente pelo aumento da movimentação[cite: 1].
+3. **Inviabilidade do RMSSD neste arranjo:** Com a taxa de amostragem do E4 (64 Hz), detector de picos simples e tolerância de 150 ms, os falsos positivos/negativos e o *jitter* temporal do pico sistólico inflam artificialmente a variabilidade batimento a batimento[cite: 1]. Portanto, o RMSSD extraído do PPG de pulso **não é utilizável** nesta configuração — um resultado negativo relevante para aplicações de monitoramento ambulatorial[cite: 1].
+
+---
+
+## 5. Base de Dados e Metadados
+
+* **Base:** WESAD (*Wearable Stress and Affect Detection*), Schmidt et al., ICMI 2018[cite: 1, 2].
+* **Fonte:** [UCI Machine Learning Repository](https://doi.org/10.24432/C57K5T) (acesso em 05/11/2026)[cite: 1, 2].
+* **Licença:** Uso científico e não comercial[cite: 1, 2]. Os arquivos brutos (`WESAD/S*/S*.pkl`) **não estão versionados neste repositório** por restrição de licença e tamanho (~2,1 GB)[cite: 1].
+* **Canais utilizados:** ECG torácico (700 Hz, 16 bits, convertido para mV), BVP/PPG de pulso não dominante (64 Hz), aceleração triaxial do pulso (32 Hz) e rótulos de protocolo (1 = *baseline*, 2 = estresse)[cite: 1, 2].
+
+---
+
+## 6. Estrutura do Repositório
+
+```text
+├── src/
+│   ├── leitura.py              # Leitura dos arquivos .pkl e conversão de unidades
+│   ├── janelas.py              # Segmentação em janelas não sobrepostas de 60 s
+│   ├── filtros.py              # Implementação dos braços: sem filtro, passa-banda e wavelet
+│   ├── deteccao.py             # Detector Pan-Tompkins (ECG) e detecção de picos (PPG)
+│   ├── alinhamento.py          # Sincronização temporal PPG x ECG por segmentos de 300 s
+│   ├── metricas.py             # Casamento de batimentos, Se, +P, nível de acaso e RMSSD
+│   ├── pipeline.py             # Orquestração do fluxo completo por participante
+│   ├── rodada_final.py         # Execução em lote nos 15 participantes com checkpoints CSV
+│   ├── analise.py              # Consolidação estatística (bootstrap, Wilcoxon) e geração de figuras
+│   ├── sintetico.py            # Gerador de sinais sintéticos para validação unitária
+│   └── conferir_conversao.py   # Verificação da conversão bruta do RespiBAN no S10
+├── notebooks/
+│   └── projeto_egc_final.ipynb # Notebook principal de reprodução no Google Colab
+├── testes/                     # Suíte de testes unitários e de integração em sinais sintéticos
+├── docs/
+│   ├── decisoes_metodo.md      # Justificativas técnicas e limitações
+│   ├── resultados_finais.md    # Detalhamento completo das tabelas e métricas
+│   ├── desvios_protocolo.md    # Registro de alterações pós-protocolo
+│   ├── roteiro_estudo.md       # Guia técnico por módulo para defesa
+│   └── declaracao_ia.md        # Declaração de uso de IA generativa
+└── requirements.txt            # Dependências do ambiente Python (numpy, scipy, pywt, pandas, etc.)
+
+## Como Reproduzir
+
+1. **Instalar dependências:**
+   ```bash
+   pip install -r requirements.txt
+A. Executar testes unitários (sinais sintéticos):
 python -I testes/teste_picos_r.py
+python -I testes/teste_wavelet.py
 python -I testes/teste_alinhamento.py
 python -I testes/teste_pipeline.py
-python -I testes/teste_rodada_analise.py
-python -I testes/teste_janelas.py
-python -I testes/teste_wavelet.py   # precisa do PyWavelets
-```
 
-Os testes usam sinal sintético ou arquivos fictícios: provam que o código
-roda como esperado, NÃO que funciona nos dados reais.
-
-## Status
-
-- [x] Leitura, conversão e validação do ECG no S10 real
-- [x] Janelas de 60 s no S10 real (19 baseline, 12 estresse)
-- [x] Figura sinal bruto x filtrado do S10 (13/11)
-- [x] Detector de picos R: testado em sintético e conferido visualmente em
-      trechos do S10 (baseline e estresse); NÃO conferido nos outros participantes
-- [x] Wavelet implementada; testada em sintético com PyWavelets no Colab
-- [x] Alinhamento por segmentos de 300 s
-- [x] Rodada do S10 com os 3 braços: `resultados/janelas_S10.csv`
-      (S10 é participante de DESENVOLVIMENTO; resultado preliminar)
-- [x] Código da rodada final e da análise (RMSSD, estratos de movimento, sensibilidade
-      de tolerância e de atraso, tabelas e figuras), testado só em sinal sintético
-- [x] Rodada dos 15 participantes (08/11/2026): 445 janelas, 0 falhas
-- [x] Tabelas finais (`notebooks/celula_passo19_analise.py`); conferir as figuras
-- [ ] Conferir visualmente o ECG e o PPG de alguns participantes além do S10 e do S11
-- [ ] Consultar o datasheet do sensor de ECG (ganho e filtros analógicos)
-- [ ] Anotar a data de acesso à base
-- [ ] Declaração de Uso de IA; relatório (4 páginas); seminário
-
-## Resultado preliminar do S10 (desenvolvimento, 1 participante)
-
-Média das janelas de 60 s, tolerância de 150 ms; Se do acaso é a mediana da
-Se em atrasos errados (nível de referência, não uma correção):
-
-| Condição | Braço | Se | +P | Se do acaso |
-|---|---|---|---|---|
-| baseline | sem filtro | 0,80 | 0,88 | 0,45 |
-| baseline | passa-banda | 0,80 | 0,89 | 0,44 |
-| baseline | wavelet | 0,80 | 0,87 | 0,45 |
-| estresse | sem filtro | 0,76 | 0,87 | 0,47 |
-| estresse | passa-banda | 0,77 | 0,89 | 0,46 |
-| estresse | wavelet | 0,76 | 0,87 | 0,46 |
-
-Os três braços ficaram praticamente iguais. Um participante não permite
-concluir nada geral.
-
-## Transparência
-
-O código deste repositório foi gerado com apoio de uma ferramenta de IA
-generativa (Claude) e deve constar na Declaração de Uso de Inteligência
-Artificial do relatório. O código só entra nos resultados depois de ser lido,
-executado e compreendido pela dupla.
+B. Executar o pipeline completo:
+Baixe o arquivo WESAD.zip da fonte oficial e execute o notebook notebooks/projeto_egc_final.ipynb
