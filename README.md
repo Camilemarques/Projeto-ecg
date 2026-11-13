@@ -1,4 +1,4 @@
-# Projeto Final de Expressão Gáfica: PPG de Pulso vs. ECG no WESAD
+# Projeto Final de Expressão Gráfica: PPG de Pulso vs. ECG no WESAD
 
 **Autoras:** Camile de Santis Marques (RA 24006992) e Luana Varela Vacari (RA 24000499)  
 **Instituição:** Pontifícia Universidade Católica de Campinas (PUC-Campinas) — Engenharia Biomédica (2º semestre de 2026)
