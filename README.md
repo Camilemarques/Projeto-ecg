@@ -10,7 +10,7 @@
 O objetivo deste projeto é avaliar o impacto do pré-processamento digital no sinal de fotopletismografia de pulso (**PPG / BVP**, captado pelo dispositivo vestível Empatica E4) para a detecção de batimentos cardíacos e a estimativa da variabilidade da frequência cardíaca (**RMSSD**), tendo como padrão-ouro o eletrocardiograma torácico (**ECG**, captado pelo RespiBAN)[cite: 1, 2].
 
 ### A Pergunta que Guia o Projeto:
-> *“Filtrar o PPG de pulso com passa-banda ou com wavelet melhora a detecção de batimentos em relação ao sinal sem filtro, e isso muda entre baseline e estresse?”*
+> *“Filtrar o PPG de pulso melhora a detecção de batimentos em relação ao sinal sem filtro, e isso muda entre baseline e estresse?”*
 
 Esta investigação parte da lacuna apontada na revisão sistemática de Elgendi et al. (*Communications Medicine*, 2026) e em Watanabe et al. (2025)[cite: 2]: embora o PPG de pulso seja prático para o monitoramento contínuo de estresse e saúde mental, ele é altamente suscetível a artefatos de movimento e não possui um fluxo de filtragem padronizado[cite: 2]. O estudo compara três abordagens de tratamento do PPG em condições de **repouso (*baseline*)** e **estresse**:
 1. **Sem filtro** (sinal bruto como linha de base)[cite: 1, 2].
